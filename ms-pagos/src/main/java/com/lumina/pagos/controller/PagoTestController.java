@@ -22,6 +22,6 @@ public class PagoTestController {
     public ResponseEntity<String> simularPago(@RequestParam String ordenId, @RequestParam String email, @RequestParam BigDecimal monto) {
         PagoExitosoEvent event = new PagoExitosoEvent(ordenId, email, monto, LocalDateTime.now());
         publisher.publicarPagoExitoso(event);
-        return ResponseEntity.ok("Evento de pago exitoso enviado a RabbitMQ para la orden " + ordenId);
+        return ResponseEntity.ok("Evento de pago exitoso enviado a Kafka para la orden " + ordenId);
     }
 }

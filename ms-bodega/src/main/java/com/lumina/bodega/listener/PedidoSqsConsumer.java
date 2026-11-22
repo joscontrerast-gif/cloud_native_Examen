@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
  * Consumidor de la cola SQS "curso-pedidos" (Dead Letter Queue: "curso-pedidos-dlq").
@@ -23,6 +24,7 @@ import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
  * </ol>
  */
 @Component
+@ConditionalOnProperty(name = "lumina.sqs.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class PedidoSqsConsumer {

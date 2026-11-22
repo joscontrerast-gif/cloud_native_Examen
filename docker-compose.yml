@@ -156,6 +156,22 @@ services:
       - lumina-network
 
   # =============================================
+  # MENSAJERÍA - RabbitMQ (con consola de administración en :15672)
+  # =============================================
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: lumina-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: lumina
+      RABBITMQ_DEFAULT_PASS: lumina_pass
+    networks:
+      - lumina-network
+
+  # =============================================
   # MICROSERVICIOS
   # =============================================
 
@@ -173,8 +189,12 @@ services:
       - MS_DELIVERY_URL=http://ms-delivery:8085
       - MS_PAGOS_URL=http://ms-pagos:8086
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=lumina
+      - SPRING_RABBITMQ_PASSWORD=lumina_pass
     depends_on:
       - kafka
+      - rabbitmq
       - ms-usuarios
       - ms-productos
       - ms-bodega
@@ -245,10 +265,15 @@ services:
       - SPRING_DATASOURCE_PASSWORD=lumina_pass
       - LUMINA_SQS_ENABLED=false
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=lumina
+      - SPRING_RABBITMQ_PASSWORD=lumina_pass
     depends_on:
       mysql-bodega:
         condition: service_healthy
       kafka:
+        condition: service_started
+      rabbitmq:
         condition: service_started
     networks:
       - lumina-network
@@ -280,10 +305,15 @@ services:
       - SPRING_DATASOURCE_USERNAME=lumina_user
       - SPRING_DATASOURCE_PASSWORD=lumina_pass
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=lumina
+      - SPRING_RABBITMQ_PASSWORD=lumina_pass
     depends_on:
       mysql-delivery:
         condition: service_healthy
       kafka:
+        condition: service_started
+      rabbitmq:
         condition: service_started
     networks:
       - lumina-network
@@ -301,10 +331,15 @@ services:
       - MERCADOPAGO_ACCESS_TOKEN=${MERCADOPAGO_ACCESS_TOKEN:-}
       - MERCADOPAGO_WEBHOOK_SECRET=${MERCADOPAGO_WEBHOOK_SECRET:-}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=lumina
+      - SPRING_RABBITMQ_PASSWORD=lumina_pass
     depends_on:
       mysql-pagos:
         condition: service_healthy
       kafka:
+        condition: service_started
+      rabbitmq:
         condition: service_started
     networks:
       - lumina-network

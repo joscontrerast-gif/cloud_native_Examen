@@ -94,6 +94,18 @@ function CarritoPage() {
       localStorage.setItem(pedidosKey, JSON.stringify(pedidos));
       localStorage.setItem('lumina-last-orden', demoOrdenId);
 
+      // Publica el evento de pago en Kafka y RabbitMQ. Es "mejor esfuerzo":
+      // si falla, el pago simulado igual se completa.
+      try {
+        await pagosService.simular({
+          ordenId: demoOrdenId,
+          email: user?.email || 'sin-email@lumina.cl',
+          monto: totalPrice,
+        });
+      } catch (e) {
+        console.warn('No se pudo publicar el evento de pago:', e);
+      }
+
       clearCart();
       navigate('/pago/exitoso');
     } catch (err) {

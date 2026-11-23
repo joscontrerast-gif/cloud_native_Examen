@@ -1,14 +1,18 @@
 package com.lumina.bodega.service;
 
+import com.lumina.bodega.dto.AlertaStockDto;
 import com.lumina.bodega.dto.ItemPedidoDto;
 import com.lumina.bodega.entity.AlertaStock;
 import com.lumina.bodega.entity.Inventario;
+import com.lumina.bodega.messaging.AlertaStockKafkaProducer;
 import com.lumina.bodega.repository.AlertaStockRepository;
 import com.lumina.bodega.repository.InventarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
@@ -18,6 +22,9 @@ public class BodegaService {
 
     private final InventarioRepository inventarioRepository;
     private final AlertaStockRepository alertaStockRepository;
+
+    @Autowired(required = false)
+    private AlertaStockKafkaProducer alertaStockKafkaProducer;
 
     public List<Inventario> listarInventario() {
         return inventarioRepository.findAll();
@@ -70,17 +77,6 @@ public class BodegaService {
         return alertaStockRepository.findByResueltaFalseOrderByFechaCreacionDesc();
     }
 
-    /**
-     * Descuenta el stock de todos los items de un pedido (mensaje "pedido pagado" de SQS)
-     * dentro de UNA sola transaccion.
-     *
-     * <p>Si un item falla (stock insuficiente o producto sin registro de inventario) la
-     * transaccion se revierte completa y la excepcion se propaga al consumidor SQS, que
-     * relanza la excepcion para que el mensaje se reintente y, tras agotar los reintentos
-     * permitidos por la redrive policy, termine en la DLQ.</p>
-     *
-     * @param items items del pedido a descontar
-     */
     @Transactional
     public void descontarStockPedido(List<ItemPedidoDto> items) {
         if (items == null || items.isEmpty()) {
@@ -94,27 +90,40 @@ public class BodegaService {
 
     private void generarAlerta(Inventario inventario) {
         List<AlertaStock> existentes = alertaStockRepository.findByProductoIdAndResueltaFalse(inventario.getProductoId());
+        AlertaStock alertaPersistida;
+
         if (!existentes.isEmpty()) {
-            // Mantener solo la primera, resolver las duplicadas
             AlertaStock primera = existentes.get(0);
             primera.setStockActual(inventario.getStock());
-            alertaStockRepository.save(primera);
+            alertaPersistida = alertaStockRepository.save(primera);
             for (int i = 1; i < existentes.size(); i++) {
                 existentes.get(i).setResuelta(true);
                 alertaStockRepository.save(existentes.get(i));
             }
-            return;
+        } else {
+            AlertaStock alerta = AlertaStock.builder()
+                    .productoId(inventario.getProductoId())
+                    .nombreProducto(inventario.getNombreProducto())
+                    .stockActual(inventario.getStock())
+                    .stockMinimo(inventario.getStockMinimo())
+                    .build();
+            alertaPersistida = alertaStockRepository.save(alerta);
+            log.warn("ALERTA: Stock critico para producto {} - Stock actual: {}, Minimo: {}",
+                    inventario.getNombreProducto(), inventario.getStock(), inventario.getStockMinimo());
         }
 
-        AlertaStock alerta = AlertaStock.builder()
-                .productoId(inventario.getProductoId())
-                .nombreProducto(inventario.getNombreProducto())
-                .stockActual(inventario.getStock())
-                .stockMinimo(inventario.getStockMinimo())
-                .build();
-        alertaStockRepository.save(alerta);
-        log.warn("ALERTA: Stock critico para producto {} - Stock actual: {}, Minimo: {}",
-                inventario.getNombreProducto(), inventario.getStock(), inventario.getStockMinimo());
+        if (alertaStockKafkaProducer != null && alertaPersistida != null) {
+            AlertaStockDto dto = AlertaStockDto.builder()
+                    .id(alertaPersistida.getId())
+                    .productoId(alertaPersistida.getProductoId())
+                    .nombreProducto(alertaPersistida.getNombreProducto())
+                    .stockActual(alertaPersistida.getStockActual())
+                    .stockMinimo(alertaPersistida.getStockMinimo())
+                    .resuelta(alertaPersistida.getResuelta())
+                    .fechaCreacion(alertaPersistida.getFechaCreacion())
+                    .build();
+            alertaStockKafkaProducer.publicarAlertaStock(dto);
+        }
     }
 
     private void resolverAlertas(Long productoId) {

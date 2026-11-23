@@ -56,6 +56,7 @@ export const carritoService = {
 
 export const pagosService = {
   crearPreferencia: (data) => api.post('/pagos/crear-preferencia', data),
+  simular: (data) => api.post('/pagos/simular', data),
   obtener: (id) => api.get(`/pagos/${id}`),
   obtenerPorOrden: (ordenId) => api.get(`/pagos/orden/${ordenId}`),
 };

@@ -36,16 +36,15 @@ public class KafkaConsumerConfig {
     private long reintentos;
 
     @Bean
-    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate) {
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-                kafkaTemplate, (record, error) -> new TopicPartition(dltTopic, -1));
-
-        DefaultErrorHandler handler = new DefaultErrorHandler(
-                recoverer, new FixedBackOff(intervaloReintentoMs, reintentos));
-        handler.addNotRetryableExceptions(IllegalArgumentException.class);
-        // Con ACK manual, confirma el offset del mensaje ya enviado al DLT para no reprocesarlo.
-        handler.setCommitRecovered(true);
-        return handler;
+    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<?, ?> kafkaTemplate) {
+    DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+            kafkaTemplate, (record, error) -> new TopicPartition(dltTopic, -1));
+     DefaultErrorHandler handler = new DefaultErrorHandler(
+            recoverer, new FixedBackOff(intervaloReintentoMs, reintentos));
+     handler.addNotRetryableExceptions(IllegalArgumentException.class);
+    // Con ACK manual, confirma el offset del mensaje ya enviado al DLT para no reprocesarlo.
+    handler.setCommitRecovered(true);
+    return handler;
     }
 
     @Bean
